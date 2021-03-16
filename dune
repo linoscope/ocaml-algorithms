@@ -1,6 +1,7 @@
-(library
- (name default)
- (libraries core_kernel stdio)
- (inline_tests)
- (preprocess (pps ppx_jane))
-)
+(alias
+ (name DEFAULT) 
+ (deps 
+  (alias_rec data-structures/runtest)
+  (alias_rec graphs/runtest)
+  (alias_rec misc/runtest)
+  )) 
