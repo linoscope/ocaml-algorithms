@@ -1,12 +1,11 @@
 open Core_kernel
 
-module RepeatedSquaring
-    (M: sig
-       type t
-       val e: t
-       val times: t -> t -> t
-     end)
-= struct
+module RepeatedSquaring(M: sig
+    type t
+    val e: t
+    val times: t -> t -> t
+  end) =
+struct
   let rec pow (x: M.t) (n: int): M.t =
     if n = 0 then M.e
     else if n % 2 = 0 then
@@ -14,6 +13,7 @@ module RepeatedSquaring
     else
       M.times (pow x (n - 1)) x
 end
+
 let%test_unit "repeated squaring of int" =
   let module RSI = RepeatedSquaring(struct
       let m = 1000_000_007
