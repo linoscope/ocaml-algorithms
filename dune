@@ -1,0 +1,6 @@
+(alias
+ (name DEFAULT) 
+ (deps 
+  (alias_rec graphs/runtest)
+  (alias_rec data-structures/runtest)
+  )) 
