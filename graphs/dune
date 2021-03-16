@@ -1,6 +1,0 @@
-(library
- (name default)
- (libraries core_kernel stdio)
- (inline_tests)
- (preprocess (pps ppx_jane))
-)
