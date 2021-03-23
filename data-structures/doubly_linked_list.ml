@@ -4,14 +4,15 @@ module Doubly_linked_list: sig
   type 'a node
   type 'a t
   val create: unit -> 'a t
-  val insert_after: 'a t -> 'a node -> 'a -> 'a node
-  val insert_before: 'a t -> 'a node -> 'a -> 'a node
   val insert_first: 'a t -> 'a -> 'a node
   val insert_last: 'a t -> 'a -> 'a node
   val remove: 'a t -> 'a node -> unit
+  val remove_first: 'a t -> 'a option
+  val remove_last: 'a t -> 'a option
   val fold: 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b
   val iter: 'a t -> f:('a -> unit) -> unit
   val to_list: 'a t -> 'a list
+  val node_value: 'a node -> 'a
 end = struct
   type 'a node = {
     mutable prev: 'a node option;
@@ -27,29 +28,6 @@ end = struct
   let create_node v = { prev = None; next = None; value = v }
 
   let create () = { first = None; last = None }
-
-  let insert_after t n v =
-    let new_node = create_node v in
-    new_node.prev <- Some n;
-    begin match n.next with
-        None ->
-        t.last <- Some new_node;
-      | Some old_next ->
-        old_next.prev <- Some new_node
-    end;
-    new_node
-
-  let insert_before t n v =
-    let new_node = create_node v in
-    new_node.next <- Some n;
-    begin match n.prev with
-        None ->
-        t.first <- Some new_node;
-      | Some old_prev ->
-        old_prev.next <- Some new_node
-    end;
-    new_node
-
 
   let insert_first t v =
     let new_first = create_node v in
@@ -92,6 +70,16 @@ end = struct
       pn.next <- Some nn;
       nn.prev <- Some pn
 
+  let remove_first t =
+    match t.first with
+      None -> None
+    | Some fn -> remove t fn; Some fn.value
+
+  let remove_last t =
+    match t.last with
+      None -> None
+    | Some ln -> remove t ln; Some ln.value
+
   let iter t ~f =
     let rec loop n_op =
       match n_op with
@@ -114,6 +102,8 @@ end = struct
   let to_list t =
     fold t ~init:[] ~f:(fun acc v -> v::acc)
     |> List.rev
+
+  let node_value n = n.value
 end
 
 
@@ -148,20 +138,18 @@ let%test_unit "remove first" =
   let dll = Dll.create () in
   ignore (Dll.insert_first dll 1 : 'a Dll.node);
   ignore (Dll.insert_first dll 2 : 'a Dll.node);
-  let first_node = Dll.insert_first dll 3 in
-  Dll.remove dll first_node;
+  ignore (Dll.remove_first dll : 'a option);
 
-  assert (List.equal (=) [2; 1] (Dll.to_list dll))
+  assert (List.equal (=) [1] (Dll.to_list dll))
 
 let%test_unit "remove last" =
   let module Dll = Doubly_linked_list in
   let dll = Dll.create () in
-  let last_node = Dll.insert_first dll 1 in
+  ignore (Dll.insert_first dll 1 : 'a Dll.node);
   ignore (Dll.insert_first dll 2 : 'a Dll.node);
-  ignore (Dll.insert_first dll 3 : 'a Dll.node);
-  Dll.remove dll last_node;
+  ignore (Dll.remove_last dll : 'a option);
 
-  assert (List.equal (=) [3; 2] (Dll.to_list dll))
+  assert (List.equal (=) [2] (Dll.to_list dll))
 
 let%test_unit "remove singleton" =
   let module Dll = Doubly_linked_list in
