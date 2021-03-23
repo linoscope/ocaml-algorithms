@@ -91,4 +91,10 @@ let%test_unit "if key value pair is inserted then that pair can be retireved lat
 let%test_unit "if no value is inserted for key then that key will return None when searched" =
   let t = TestTrieTree.empty in
   let t = TestTrieTree.insert t "abc" 1 in
-  assert Poly.((TestTrieTree.search t "zzz") = None);
+  assert Poly.((TestTrieTree.search t "zzz") = None)
+
+let%test_unit "values can be updated" =
+  let t = TestTrieTree.empty in
+  let t = TestTrieTree.insert t "abc" 1 in
+  let t = TestTrieTree.insert t "abc" 2 in
+  assert Poly.((TestTrieTree.search t "abc") = (Some 2))
