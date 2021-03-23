@@ -1,4 +1,3 @@
-open Doubly_linked_list
 open Core_kernel
 
 module Make(Key: Hashtbl_intf.Key): sig
@@ -9,13 +8,13 @@ module Make(Key: Hashtbl_intf.Key): sig
   val find: 'v t -> key -> 'v option
 end = struct
   module H = Hashtbl.Make(Key)
-  module Dll = Doubly_linked_list
+  module Dll = Doubly_linked
 
   type key = Key.t
 
   type 'v t = {
     cache: (key * 'v) Dll.t;
-    lookup_tbl: (key * 'v) Dll.node H.t;
+    lookup_tbl: (key * 'v) Dll.Elt.t H.t;
     mutable size: int;
     size_limit: int;
   }
@@ -49,7 +48,7 @@ end = struct
     match H.find lookup_tbl k with
       None -> None
     | Some old_node ->
-      let (k, v) = Dll.node_value old_node in
+      let (k, v) = Dll.Elt.value old_node in
       Dll.remove cache old_node;
       let new_node = Dll.insert_first cache (k, v) in
       H.set lookup_tbl ~key:k ~data:new_node;
