@@ -1,100 +1,64 @@
 open Core_kernel
 
-module type TrieKey_intf = sig
-  type t
-  type fragment
-  val to_list: t -> fragment list
-end
-
-module type Map_intf = sig
-  type 'a t
+module type Map = sig
   type key
-  val set: 'a t -> key -> 'a -> 'a t
-  val find: 'a t -> key -> 'a option
-  val empty: 'a t
-end
-
-module type Trie_intf = sig
   type 'a t
-  type key
-  val empty: 'a t
-  val insert: 'a t -> key -> 'a -> 'a t
-  val search: 'a t -> key -> 'a option
+  val empty : 'a t
+  val find : 'a t -> key:key -> 'a option
+  val set : 'a t -> key:key -> data:'a -> 'a t
 end
 
-module TrieTree
-    (TrieKey: TrieKey_intf)
-    (FragmentMap: Map_intf with type key := TrieKey.fragment)
-  : Trie_intf with type key := TrieKey.t =
-struct
-  type 'a node = {
-    value: 'a option;
-    children: 'a node FragmentMap.t
-  }
+module Make (M : Map) : Map with type key = M.key list = struct
+  type key = M.key list
 
-  type 'a t = 'a node
+  type 'a t = Node of 'a option * 'a t M.t
 
-  let empty = { value = None; children = FragmentMap.empty }
+  let empty = Node (None, M.empty)
 
-  let insert t key value =
-    let rec loop ({children; _} as node) fragments =
-      match fragments with
-        [] -> { value = Some value; children }
-      | f::fs ->
-        let next_node =
-          match FragmentMap.find children f with
-            None -> empty
-          | Some n -> n
-        in
-        let new_children = FragmentMap.set children f (loop next_node fs) in
-        { node with children = new_children }
-    in
-    let fragments = TrieKey.to_list key in
-    loop t fragments
+  let rec find t ~key =
+    match key, t with
+    | [], Node (None, _) -> None
+    | [], Node (Some x, _) -> Some x
+    | x::xs, Node (_, m) ->
+      M.find m ~key:x
+      |> Option.bind ~f:(fun t' -> find t' ~key:xs)
 
-  let search t key =
-    let rec loop {value; children} fragments =
-      match fragments with
-        [] -> value
-      | f::fs ->
-        match FragmentMap.find children f with
-          None -> None
-        | Some next_node -> loop next_node fs
-    in
-    let fragments = TrieKey.to_list key in
-    loop t fragments
+  let rec set t ~key ~data =
+    match key, t with
+    | [], Node (_, m) -> Node (Some data, m)
+    | x::xs, Node (y, m) ->
+      match M.find m ~key:x with
+      | None -> Node (y, M.set m ~key:x ~data:(set empty ~key:xs ~data))
+      | Some t' -> Node (y, M.set m ~key:x ~data:(set t' ~key:xs ~data ))
 end
 
-module TestTrieTree =
-  TrieTree
-    (struct
-      type t = string
-      type fragment = char
-      let to_list = String.to_list
-    end)
-    (struct
-      type 'a t = (char * 'a) list
-      let empty = []
-      let set t key v = (key, v)::t
-      let find t key = List.Assoc.find t ~equal:(Char.equal) key
-    end)
 
-let%test_unit "if key value pair is inserted then that pair can be retireved later" =
-  let t = TestTrieTree.empty in
-  let t = TestTrieTree.insert t "abc" 1 in
-  let t = TestTrieTree.insert t "acd" 2 in
-  let t = TestTrieTree.insert t "bcd" 3 in
-  assert Poly.((TestTrieTree.search t "abc") = (Some 1));
-  assert Poly.((TestTrieTree.search t "acd") = (Some 2));
-  assert Poly.((TestTrieTree.search t "bcd") = (Some 3))
+module Assoc_list_make (Key : Comparable.S) : Map with type key = Key.t = struct
+  type key = Key.t
+  type 'a t = (key * 'a) list
+  let empty = []
+  let rec find t ~key = match t with
+    | [] -> None
+    | (k, v)::xs -> if Key.(key = k) then Some v else find xs ~key
+  let set t ~key ~data = (key, data)::t
+end
 
-let%test_unit "if no value is inserted for key then that key will return None when searched" =
-  let t = TestTrieTree.empty in
-  let t = TestTrieTree.insert t "abc" 1 in
-  assert Poly.((TestTrieTree.search t "zzz") = None)
+module Trie = Make (Assoc_list_make (Char))
 
-let%test_unit "values can be updated" =
-  let t = TestTrieTree.empty in
-  let t = TestTrieTree.insert t "abc" 1 in
-  let t = TestTrieTree.insert t "abc" 2 in
-  assert Poly.((TestTrieTree.search t "abc") = (Some 2))
+let%expect_test "test" =
+  let t =
+    Trie.empty
+    |> Trie.set ~key:(String.to_list "abc") ~data:1
+    |> Trie.set ~key:(String.to_list "abd") ~data:2
+    |> Trie.set ~key:(String.to_list "abce") ~data:3
+    |> Trie.set ~key:(String.to_list "xyz") ~data:4
+  in
+
+  ["abc"; "abd"; "abce"; "xyz"]
+  |> List.map ~f:String.to_list
+  |> List.map ~f:(fun k -> Trie.find t ~key:k)
+  |> List.sexp_of_t (fun x -> Option.sexp_of_t (fun y -> Int.sexp_of_t y) x)
+  |> Sexp.to_string
+  |> print_endline;
+
+  [%expect {| ((1)(2)(3)(4)) |}]
